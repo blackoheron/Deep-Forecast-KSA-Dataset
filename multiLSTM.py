@@ -3,42 +3,43 @@ import numpy as np
 import time
 import csv
 import sys
-import tensorflow as tf
 from keras.models import Sequential
 from keras.layers.core import Dense, Activation, Dropout, Flatten
 from keras.layers import Convolution2D
 from keras.layers.recurrent import LSTM, SimpleRNN, GRU
+from sklearn.metrics import r2_score
 import keras as keras
+import tensorflow as tf
 np.random.seed(1234)
 from keras import backend as K
 
 class multiLSTM:
     def __init__(self):
-        self.inputHorizon = 12 # number of time steps as input
-        self.inOutVecDim = 57  # number of stations
+        self.inputHorizon = 12  # number of time steps as input
+        self.inOutVecDim = 15   # number of stations
         self.lstmModels = [ None for _ in range(6)]
         self.xTest, self.yTest = None, None
-        file_dataset = '/home/path/to/dataset/file'
+        file_dataset = r'C:\Users\USER\DATA_SET2_long.dat'
         with open(file_dataset) as f:
             data = csv.reader(f, delimiter=",")
             winds = []
             for line in data:
                 winds.append((line))
-        self.winds = (np.array(winds)).astype(float) # all data
+        self.winds = (np.array(winds)).astype(float)    # all data
         self.winds = self.winds[:,:self.inOutVecDim]
         self.means_stds = [0,0]
         self.winds, self.means_stds = self.normalize_winds_0_1(self.winds)
-        self.validation_split = 0.05
-        self.batchSize = 3
+        self.validation_split = 0.05    #float b/w 0 and 1: stands for the fraction of data to be used for validation
+        self.batchSize = 3              # number of samples that will be propagated through the network
         activation = ['sigmoid',   "tanh",   "relu", 'linear']
         self.activation = activation[2]
         realRun = 1
         #          model number :           1   2   3   4   5   6
-        self.epochs, self.trainDataRate = [[15, 17, 15, 17, 15, 15], 1] if realRun else [[ 1, 1, 1, 1, 1, 1] , 0.005]# percentage of data used for training(saving time for debuging)
+        self.epochs, self.trainDataRate = [[15, 17, 15, 17, 15, 15], 1] if realRun else [[ 1, 1, 1, 1, 1, 1] , 0.005]   # percentage of data used for training(saving time for debugging)
 
     def normalize_winds_0_1(self, winds):
         '''normalize based on each station data'''
-        stations = winds.shape[1]
+        stations = winds.shape[1] # shape returns (rows, columsn) so shape[1] is column numbers
         normal_winds = []
         mins_maxs = []
         windMax = winds.max()
@@ -47,8 +48,8 @@ class multiLSTM:
         mins_maxs = [windMin, windMax]
         return np.array(normal_winds), mins_maxs
 
-    def denormalize(self, vec):
-        res = vec * self.means_stds[1] + self.means_stds[0]        #  fro 0 to 1
+    def denormalize(self, vec): #used to denormalise Ytest
+        res = vec * self.means_stds[1] + self.means_stds[0]        #  from 0 to 1
         return res
 
     def loadData_1(self):
@@ -58,11 +59,11 @@ class multiLSTM:
             result.append(self.winds[index:index + self.inputHorizon])
         result = np.array(result)  
 
-        trainRow = int(6000 * self.trainDataRate)
+        trainRow = int(4500 * self.trainDataRate)
         X_train = result[:trainRow, :]
         y_train = self.winds[self.inputHorizon:trainRow + self.inputHorizon]
-        self.xTest = result[6000:6361, :]
-        self.yTest = self.winds[6000 + self.inputHorizon:6361 + self.inputHorizon]
+        self.xTest = result[4500:4861, :]
+        self.yTest = self.winds[4500 + self.inputHorizon:4861 + self.inputHorizon]
         self.predicted = np.zeros_like(self.yTest)
         return [X_train, y_train]
 
@@ -86,7 +87,7 @@ class multiLSTM:
     def buildModelLSTM_1(self):
         model = Sequential()
         in_nodes = out_nodes = self.inOutVecDim
-        layers = [in_nodes, 57*2, 57, 32, out_nodes]
+        layers = [in_nodes, 15*2, 15, 32, out_nodes]
         model.add(LSTM(input_dim=layers[0],output_dim=layers[1],
             return_sequences=False))
     
@@ -101,7 +102,7 @@ class multiLSTM:
 
     def buildModelLSTM_2(self):
         model = Sequential()
-        layers = [self.inOutVecDim, 10 , 57 * 2, 32, self.inOutVecDim]
+        layers = [self.inOutVecDim, 10 , 15 * 2, 32, self.inOutVecDim]
         model.add(LSTM(input_dim=layers[0],output_dim=layers[1],
             return_sequences=False))
 
@@ -118,7 +119,7 @@ class multiLSTM:
     def buildModelLSTM_3(self):
         model = Sequential()
 
-        layers = [self.inOutVecDim, 57, 57 * 2, 32, self.inOutVecDim]
+        layers = [self.inOutVecDim, 15, 15 * 2, 32, self.inOutVecDim]
         model.add(LSTM(input_dim=layers[0], output_dim=layers[1],
             return_sequences=False))
 
@@ -135,7 +136,7 @@ class multiLSTM:
     def buildModelLSTM_4(self):
         model = Sequential()
 
-        layers = [self.inOutVecDim, 57, 57 * 2, 57, self.inOutVecDim]
+        layers = [self.inOutVecDim, 15, 15 * 2, 15, self.inOutVecDim]
         model.add(LSTM(input_dim=layers[0], output_dim=layers[1],
             return_sequences=True))
 
@@ -154,7 +155,7 @@ class multiLSTM:
     def buildModelLSTM_5(self):
         model = Sequential()
 
-        layers = [self.inOutVecDim, 30, 57 * 2, 57, self.inOutVecDim]
+        layers = [self.inOutVecDim, 30, 15 * 2, 15, self.inOutVecDim]
         model.add(LSTM(input_dim=layers[0], output_dim=layers[1],
             return_sequences=False))
 
@@ -169,7 +170,7 @@ class multiLSTM:
 
     def buildModelLSTM_6(self):
         model = Sequential()
-        layers = [self.inOutVecDim, 57*2, 57 * 2, 57, self.inOutVecDim]
+        layers = [self.inOutVecDim, 15*2, 15 * 2, 15, self.inOutVecDim]
         model.add(LSTM(input_dim=layers[0], output_dim=layers[1],
         return_sequences=True))
 
@@ -231,9 +232,10 @@ class multiLSTM:
         rmse = np.sqrt((np.mean((np.absolute(denormalYTest - denormalYPredicted)) ** 2)))
         nrsme_maxMin = 100*rmse / (denormalYTest.max() - denormalYTest.min())
         nrsme_mean = 100 * rmse / (denormalYTest.mean())
-
-        return mae, rmse, nrsme_maxMin, nrsme_mean
-
+        corr_2 = r2_score(denormalYTest, denormalYPredicted)
+        
+        return mae, rmse,nrsme_maxMin, nrsme_mean, corr_2
+    
     def drawGraphStation(self, station, visualise = 1, ax = None ):
         '''draw graph of predicted vs real values'''
 
@@ -241,9 +243,9 @@ class multiLSTM:
         denormalYTest = self.denormalize(yTest)
 
         denormalPredicted = self.denormalize(self.predicted[:, station])
-
-        mae, rmse, nrmse_maxMin, nrmse_mean  = self.errorMeasures(denormalYTest, denormalPredicted)
-        print 'station %s : MAE = %7.7s   RMSE = %7.7s    nrmse_maxMin = %7.7s   nrmse_mean = %7.7s'%(station+1, mae, rmse, nrmse_maxMin, nrmse_mean )
+        
+        mae, rmse,nrsme_maxMin ,nrmse_mean, corr_2  = self.errorMeasures(denormalYTest, denormalPredicted)
+        print ('station %s : MAE = %7.7s   RMSE = %7.7s  nrsme_maxMin = %7.7s    nrmse_mean = %7.7s R^2 score = %7.7s'%(station+1, mae, rmse, nrsme_maxMin,nrmse_mean, corr_2 ))
 
         if visualise:
             if ax is None :
@@ -252,26 +254,20 @@ class multiLSTM:
 
             ax.plot(denormalYTest, label='Real')
             ax.plot(denormalPredicted, label='Predicted', color='red')
-            ax.set_xticklabels([0, 100, 200, 300], rotation=40)
 
-        return mae, rmse, nrmse_maxMin, nrmse_mean
+        return mae, rmse, nrsme_maxMin ,nrmse_mean, corr_2
 
-    def drawGraphAllStations(self):
-        rows, cols = 4, 4
-        maeRmse = np.zeros((rows*cols,4))
-
+    def drawGraphAllStations(self, staInd):
+        rows, cols = 1,1 
         fig, ax_array = plt.subplots(rows, cols, sharex=True, sharey=True )
-        staInd = 0
+        maeRmse = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         for ax in np.ravel(ax_array):
             maeRmse[staInd] = self.drawGraphStation(staInd, visualise=1, ax=ax)
-            staInd += 1
-        plt.xticks([0, 100, 200, 300])#, rotation=45)
-        errMean = maeRmse.mean(axis=0)
-        print maeRmse.mean(axis=0)
-
-        filename = 'pgf/finalEpoch'
-        plt.savefig('{}.pgf'.format(filename))
-        plt.savefig('{}.pdf'.format(filename))
+            plt.xticks([0, 100, 200, 300])
+           
+        filename = 'KSAlongEpochSt '+ str(staInd)
+        plt.savefig('{}.png'.format(filename))
+        plt.savefig('{}.png'.format(filename))
         plt.show()
 
         return
@@ -279,20 +275,19 @@ class multiLSTM:
     def run(self):
         #  training
         xTrain, yTrain = self.loadData_1()
-        print ' Training LSTM 1 ...'
+        print (' Training LSTM 1 ...')
         self.lstmModels[0] = self.trainLSTM(xTrain, yTrain, 1)
 
         for modelInd in range(1,6):
             xTrain, yTrain = self.loadData(xTrain, yTrain, self.lstmModels[modelInd-1])
-            print ' Training LSTM %s ...' % (modelInd+1)
+            print (' Training LSTM %s ...' % (modelInd+1))
             self.lstmModels[modelInd] = self.trainLSTM(xTrain, yTrain, modelInd+1)
 
         # testing
-        print '...... TESTING  ...'
+        print ('...... TESTING  ...')
         self.test()
-
-        self.drawGraphAllStations()
+        for staInd in range(15):
+            self.drawGraphAllStations(staInd)
 
 DeepForecaste = multiLSTM()
 DeepForecaste.run()
-
